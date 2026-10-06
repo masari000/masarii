@@ -1480,66 +1480,141 @@ body.dark .hero-logo-image img{filter:drop-shadow(8px 10px 0 rgba(69,93,108,.13)
  .extra-empty-icon{font-size:48px}
 }
 </style>
-
-<!-- MASARI CONTROL INTEGRATION -->
+<!-- MASARI CONTROL INTEGRATION v2 -->
 <script>
 (function(){
   const SUPABASE_URL="https://xsoreadsioxxpbsrygaq.supabase.co";
   const SUPABASE_KEY="sb_publishable_pCbks8kySoi3_QxcsqANow_Rrw775Ah";
-  const ADD_KEY="masari_remote_additions_v1";
-  const VISITOR_KEY="masari_visitor_id";
+  const VISITOR_KEY="masari_visitor_id_v2";
   const visitorId=localStorage.getItem(VISITOR_KEY)||("v_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,10));
   localStorage.setItem(VISITOR_KEY,visitorId);
-  const esc2=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+
   async function sb(path,opts={}){
     const r=await fetch(SUPABASE_URL+"/rest/v1/"+path,{
-      ...opts,headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+SUPABASE_KEY,"Content-Type":"application/json",...(opts.headers||{})}
+      ...opts,
+      headers:{
+        apikey:SUPABASE_KEY,
+        Authorization:"Bearer "+SUPABASE_KEY,
+        "Content-Type":"application/json",
+        ...(opts.headers||{})
+      }
     });
     if(!r.ok) throw new Error(await r.text());
-    const t=await r.text(); return t?JSON.parse(t):null;
+    const t=await r.text();
+    return t?JSON.parse(t):null;
   }
-  async function logView(){
-    try{
-      const route=location.hash||"#/home";
-      await sb("masari_views",{method:"POST",body:JSON.stringify({visitor_id:visitorId,page:route,referrer:document.referrer||null,user_agent:navigator.userAgent.slice(0,250)})});
-    }catch(e){}
-  }
-  async function getAdds(){
-    try{return await sb("masari_additions?select=*&enabled=eq.true&order=created_at.desc&limit=200")}catch(e){return []}
-  }
-  function currentContext(){
-    const h=location.hash||"#/home", parts=h.replace(/^#\//,"").split("/");
+
+  function context(){
+    const h=location.hash||"#/home";
+    const parts=h.replace(/^#\//,"").split("/");
     return {route:parts[0]||"home",subject:parts[1]||"",unit:parts[2]||"",lesson:parts[3]||""};
   }
+
   function matches(a,c){
-    return (!a.route||a.route==="all"||a.route===c.route) &&
+    const routeOk=!a.route||a.route==="all"||a.route==="scientific"||a.route===c.route;
+    return routeOk &&
       (!a.subject_id||a.subject_id===c.subject) &&
       (!a.unit_id||a.unit_id===c.unit) &&
       (!a.lesson_id||a.lesson_id===c.lesson);
   }
-  function addBlock(items){
-    const old=document.getElementById("masari-remote-block"); if(old) old.remove();
-    if(!items.length)return;
-    const wrap=document.createElement("section"); wrap.id="masari-remote-block"; wrap.style.cssText="margin:24px auto;max-width:1100px;padding:0 16px";
-    wrap.innerHTML='<div style="background:#fff9e7;border:2px dashed #637F91;border-radius:22px;padding:18px"><h2 style="margin:0 0 14px;color:#455D6C">✨ إضافات مساري</h2><div style="display:grid;gap:12px">'+items.map(a=>{
-      const title=esc2(a.title), body=esc2(a.content||"");
-      const link=a.url?`<a href="${esc2(a.url)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;color:#455D6C;font-weight:800">فتح الرابط ↗</a>`:"";
-      return `<article style="background:#fff;border:1px solid #d7dde0;border-radius:16px;padding:14px"><strong>${title}</strong>${body?`<div style="margin-top:7px;line-height:1.8">${body}</div>`:""}${link}</article>`;
-    }).join("")+"</div></div>";
-    const main=document.querySelector("#main"); if(main) main.appendChild(wrap);
+
+  function esc(s){
+    return String(s??"").replace(/[&<>"']/g,function(ch){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[ch];
+    });
   }
-  async function loadAdds(){
-    const all=await getAdds(), c=currentContext();
-    addBlock(all.filter(a=>matches(a,c)));
+
+  async function logView(){
+    try{
+      await sb("masari_views",{
+        method:"POST",
+        body:JSON.stringify({
+          visitor_id:visitorId,
+          page:location.hash||"#/home",
+          referrer:document.referrer||null,
+          user_agent:(navigator.userAgent||"").slice(0,250)
+        })
+      });
+    }catch(e){}
   }
-  window.MASARI_REMOTE={loadAdds,logView};
-  const oldLayout=window.layout;
-  // layout is scoped in the site's main IIFE, so observe #main instead.
-  new MutationObserver(()=>setTimeout(loadAdds,60)).observe(document.querySelector("#main")||document.body,{childList:true});
-  logView(); setTimeout(loadAdds,500);
-  window.addEventListener("hashchange",()=>{logView();setTimeout(loadAdds,150)});
+
+  async function getRemoteContent(){
+    let modern=[],legacy=[];
+    try{
+      modern=await sb("masari_content?select=id,kind,title,content,url,route,subject_id,unit_id,lesson_id,data,enabled,sort_order,created_at&enabled=eq.true&order=sort_order.asc,created_at.desc&limit=500");
+    }catch(e){}
+    try{
+      legacy=await sb("masari_additions?select=id,kind,title,content,url,route,subject_id,unit_id,lesson_id,enabled,created_at&enabled=eq.true&order=created_at.desc&limit=200");
+    }catch(e){}
+    return modern.concat(legacy.map(x=>({...x,_legacy:true})));
+  }
+
+  function label(kind){
+    return ({
+      subjects:"📚 مادة / وحدة",
+      lessons:"📖 درس",
+      questions:"📝 سؤال / اختبار",
+      links:"🔗 رابط",
+      videos:"🎬 فيديو / قائمة تشغيل",
+      files:"📁 ملف / PDF",
+      images:"🖼️ صورة",
+      news:"📰 أخبار الشهادة",
+      tips:"💡 نصيحة",
+      updates:"📢 آخر تحديث",
+      settings:"⚙️"
+    })[kind]||"✨ إضافة جديدة";
+  }
+
+  function render(items){
+    const old=document.getElementById("masari-remote-block");
+    if(old) old.remove();
+    items=items.filter(x=>x.kind!=="settings");
+    if(!items.length) return;
+
+    const wrap=document.createElement("section");
+    wrap.id="masari-remote-block";
+    wrap.style.cssText="margin:24px auto;max-width:1120px;padding:0 16px;position:relative;z-index:4";
+
+    const cards=items.map(a=>{
+      const title=esc(a.title||"بدون عنوان");
+      const body=esc(a.content||"").replace(/\n/g,"<br>");
+      const url=a.url?esc(a.url):"";
+      const link=url?'<a href="'+url+'" target="_blank" rel="noopener noreferrer" style="display:inline-block;margin-top:10px;padding:8px 12px;border-radius:10px;background:#455D6C;color:#fff;text-decoration:none;font-weight:800">فتح الرابط ↗</a>':"";
+      return '<article style="background:#fff;border:1px solid #d7dde0;border-radius:16px;padding:14px;box-shadow:0 3px 10px rgba(69,93,108,.08)">'+
+        '<div style="font-size:12px;color:#637F91;font-weight:800;margin-bottom:5px">'+label(a.kind)+'</div>'+
+        '<strong style="font-size:17px;color:#455D6C">'+title+'</strong>'+
+        (body?'<div style="margin-top:7px;line-height:1.9;color:#47545b">'+body+'</div>':"")+
+        link+
+      '</article>';
+    }).join("");
+
+    wrap.innerHTML='<div style="background:#fff9e7;border:2px dashed #637F91;border-radius:22px;padding:18px">'+
+      '<h2 style="margin:0 0 14px;color:#455D6C">✨ إضافات لوحة تحكم مساري</h2>'+
+      '<div style="display:grid;gap:12px">'+cards+'</div></div>';
+
+    const main=document.querySelector("#main");
+    if(main) main.appendChild(wrap);
+    else document.body.appendChild(wrap);
+  }
+
+  let timer=0;
+  async function loadRemote(){
+    clearTimeout(timer);
+    timer=setTimeout(async function(){
+      const all=await getRemoteContent();
+      render(all.filter(x=>matches(x,context())));
+    },120);
+  }
+
+  window.MASARI_REMOTE={loadRemote,logView};
+  logView();
+  loadRemote();
+
+  window.addEventListener("hashchange",function(){
+    logView();
+    loadRemote();
+  });
 })();
 </script>
-
 </body>
 </html>
