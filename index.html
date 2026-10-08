@@ -1496,141 +1496,127 @@ body.dark .hero-logo-image img{filter:drop-shadow(8px 10px 0 rgba(69,93,108,.13)
  .extra-empty-icon{font-size:48px}
 }
 </style>
-<!-- MASARI CONTROL INTEGRATION v2 -->
+
+<!-- MASARI LIGHT MODE + VISITOR TRACKING FINAL -->
+<style id="masari-force-light">
+/* Masari always keeps its approved light design, regardless of device/browser dark mode. */
+html { color-scheme: light !important; }
+body,
+body.dark {
+  --paper:#f7f2e8 !important;
+  --card:#fffdf8 !important;
+  --ink:#455D6C !important;
+  --line:#d7dde0 !important;
+  --muted:#637F91 !important;
+  background-color:#f7f2e8 !important;
+  color:#455D6C !important;
+  background-image:radial-gradient(rgba(99,127,145,.10) 1px,transparent 1px) !important;
+}
+body.dark .topbar,
+body.dark .sidebar,
+body.dark .footer { background:rgba(255,253,248,.94) !important; color:#455D6C !important; }
+body.dark .top-search,
+body.dark .icon-btn,
+body.dark .btn,
+body.dark .card,
+body.dark .modal-card,
+body.dark .empty,
+body.dark .option { background:#fffdf8 !important; color:#455D6C !important; }
+body.dark .hero { background:linear-gradient(135deg,#9fb6c5 0%,#7893a4 48%,#506a79 100%) !important; }
+body.dark .subject-icon { background:#ffe69d !important; }
+body.dark .hero-logo span { background:rgba(255,253,248,.78) !important; }
+body.dark .main-nav a:hover,
+body.dark .main-nav a.active { background:#eef2f3 !important; }
+</style>
+
 <script>
 (function(){
+  "use strict";
+
+  /* Force the light version even if an old saved dark class exists. */
+  function forceLight(){
+    try{
+      document.documentElement.style.colorScheme="light";
+      document.body && document.body.classList.remove("dark");
+      localStorage.removeItem("masari-theme");
+    }catch(e){}
+  }
+  forceLight();
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",forceLight,{once:true});
+  }
+  try{
+    new MutationObserver(function(){
+      if(document.body && document.body.classList.contains("dark")){
+        document.body.classList.remove("dark");
+      }
+    }).observe(document.body || document.documentElement,{attributes:true,attributeFilter:["class"]});
+  }catch(e){}
+
   const SUPABASE_URL="https://xsoreadsioxxpbsrygaq.supabase.co";
   const SUPABASE_KEY="sb_publishable_pCbks8kySoi3_QxcsqANow_Rrw775Ah";
-  const VISITOR_KEY="masari_visitor_id_v2";
-  const visitorId=localStorage.getItem(VISITOR_KEY)||("v_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,10));
-  localStorage.setItem(VISITOR_KEY,visitorId);
+  const VISITOR_KEY="masari_visitor_id_v3";
 
-  async function sb(path,opts={}){
-    const r=await fetch(SUPABASE_URL+"/rest/v1/"+path,{
-      ...opts,
-      headers:{
-        apikey:SUPABASE_KEY,
-        Authorization:"Bearer "+SUPABASE_KEY,
-        "Content-Type":"application/json",
-        ...(opts.headers||{})
-      }
-    });
-    if(!r.ok) throw new Error(await r.text());
-    const t=await r.text();
-    return t?JSON.parse(t):null;
+  let visitorId="";
+  try{
+    visitorId=localStorage.getItem(VISITOR_KEY)||"";
+    if(!visitorId){
+      visitorId="v_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,12);
+      localStorage.setItem(VISITOR_KEY,visitorId);
+    }
+  }catch(e){
+    visitorId="v_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,12);
   }
 
-  function context(){
-    const h=location.hash||"#/home";
-    const parts=h.replace(/^#\//,"").split("/");
-    return {route:parts[0]||"home",subject:parts[1]||"",unit:parts[2]||"",lesson:parts[3]||""};
-  }
+  async function recordView(){
+    const payload={
+      visitor_id:visitorId,
+      page:location.hash || "#/home",
+      referrer:document.referrer || null,
+      user_agent:(navigator.userAgent || "").slice(0,250)
+    };
 
-  function matches(a,c){
-    const routeOk=!a.route||a.route==="all"||a.route==="scientific"||a.route===c.route;
-    return routeOk &&
-      (!a.subject_id||a.subject_id===c.subject) &&
-      (!a.unit_id||a.unit_id===c.unit) &&
-      (!a.lesson_id||a.lesson_id===c.lesson);
-  }
-
-  function esc(s){
-    return String(s??"").replace(/[&<>"']/g,function(ch){
-      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[ch];
-    });
-  }
-
-  async function logView(){
     try{
-      await sb("masari_views",{
+      const response=await fetch(SUPABASE_URL+"/rest/v1/masari_views",{
         method:"POST",
-        body:JSON.stringify({
-          visitor_id:visitorId,
-          page:location.hash||"#/home",
-          referrer:document.referrer||null,
-          user_agent:(navigator.userAgent||"").slice(0,250)
-        })
+        headers:{
+          "apikey":SUPABASE_KEY,
+          "Authorization":"Bearer "+SUPABASE_KEY,
+          "Content-Type":"application/json",
+          "Prefer":"return=minimal"
+        },
+        body:JSON.stringify(payload),
+        keepalive:true
       });
-    }catch(e){}
+
+      if(!response.ok){
+        const msg=await response.text();
+        console.warn("Masari visitor tracking failed:",response.status,msg);
+        return false;
+      }
+      return true;
+    }catch(error){
+      console.warn("Masari visitor tracking failed:",error);
+      return false;
+    }
   }
 
-  async function getRemoteContent(){
-    let modern=[],legacy=[];
-    try{
-      modern=await sb("masari_content?select=id,kind,title,content,url,route,subject_id,unit_id,lesson_id,data,enabled,sort_order,created_at&enabled=eq.true&order=sort_order.asc,created_at.desc&limit=500");
-    }catch(e){}
-    try{
-      legacy=await sb("masari_additions?select=id,kind,title,content,url,route,subject_id,unit_id,lesson_id,enabled,created_at&enabled=eq.true&order=created_at.desc&limit=200");
-    }catch(e){}
-    return modern.concat(legacy.map(x=>({...x,_legacy:true})));
+  /* Record the first page view, then one view whenever the student changes route. */
+  let lastPage="";
+  function trackCurrentPage(){
+    const page=location.hash || "#/home";
+    if(page===lastPage) return;
+    lastPage=page;
+    recordView();
   }
 
-  function label(kind){
-    return ({
-      subjects:"📚 مادة / وحدة",
-      lessons:"📖 درس",
-      questions:"📝 سؤال / اختبار",
-      links:"🔗 رابط",
-      videos:"🎬 فيديو / قائمة تشغيل",
-      files:"📁 ملف / PDF",
-      images:"🖼️ صورة",
-      news:"📰 أخبار الشهادة",
-      tips:"💡 نصيحة",
-      updates:"📢 آخر تحديث",
-      settings:"⚙️"
-    })[kind]||"✨ إضافة جديدة";
-  }
+  trackCurrentPage();
+  window.addEventListener("hashchange",trackCurrentPage);
 
-  function render(items){
-    const old=document.getElementById("masari-remote-block");
-    if(old) old.remove();
-    items=items.filter(x=>x.kind!=="settings");
-    if(!items.length) return;
-
-    const wrap=document.createElement("section");
-    wrap.id="masari-remote-block";
-    wrap.style.cssText="margin:24px auto;max-width:1120px;padding:0 16px;position:relative;z-index:4";
-
-    const cards=items.map(a=>{
-      const title=esc(a.title||"بدون عنوان");
-      const body=esc(a.content||"").replace(/\n/g,"<br>");
-      const url=a.url?esc(a.url):"";
-      const link=url?'<a href="'+url+'" target="_blank" rel="noopener noreferrer" style="display:inline-block;margin-top:10px;padding:8px 12px;border-radius:10px;background:#455D6C;color:#fff;text-decoration:none;font-weight:800">فتح الرابط ↗</a>':"";
-      return '<article style="background:#fff;border:1px solid #d7dde0;border-radius:16px;padding:14px;box-shadow:0 3px 10px rgba(69,93,108,.08)">'+
-        '<div style="font-size:12px;color:#637F91;font-weight:800;margin-bottom:5px">'+label(a.kind)+'</div>'+
-        '<strong style="font-size:17px;color:#455D6C">'+title+'</strong>'+
-        (body?'<div style="margin-top:7px;line-height:1.9;color:#47545b">'+body+'</div>':"")+
-        link+
-      '</article>';
-    }).join("");
-
-    wrap.innerHTML='<div style="background:#fff9e7;border:2px dashed #637F91;border-radius:22px;padding:18px">'+
-      '<h2 style="margin:0 0 14px;color:#455D6C">✨ إضافات لوحة تحكم مساري</h2>'+
-      '<div style="display:grid;gap:12px">'+cards+'</div></div>';
-
-    const main=document.querySelector("#main");
-    if(main) main.appendChild(wrap);
-    else document.body.appendChild(wrap);
-  }
-
-  let timer=0;
-  async function loadRemote(){
-    clearTimeout(timer);
-    timer=setTimeout(async function(){
-      const all=await getRemoteContent();
-      render(all.filter(x=>matches(x,context())));
-    },120);
-  }
-
-  window.MASARI_REMOTE={loadRemote,logView};
-  logView();
-  loadRemote();
-
-  window.addEventListener("hashchange",function(){
-    logView();
-    loadRemote();
-  });
+  /* Expose a tiny diagnostic hook for testing without changing the UI. */
+  window.MASARI_ANALYTICS={trackCurrentPage,recordView,visitorId};
 })();
 </script>
+
 </body>
 </html>
