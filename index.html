@@ -2001,5 +2001,35 @@ body.dark,html.dark,body[data-theme="dark"],html[data-theme="dark"]{color-scheme
 <script id="masari-final-light-lock">
 (()=>{const lock=()=>{document.documentElement.style.setProperty('color-scheme','only light','important');document.documentElement.classList.remove('dark');document.documentElement.removeAttribute('data-theme');if(document.body){document.body.classList.remove('dark');document.body.removeAttribute('data-theme');document.body.style.setProperty('color-scheme','only light','important');}};lock();document.addEventListener('DOMContentLoaded',lock);new MutationObserver(lock).observe(document.documentElement,{attributes:true,attributeFilter:['class','data-theme']});document.addEventListener('click',e=>{if(e.target.closest('[data-action="toggle-theme"]')){e.preventDefault();lock();}},true);})();
 </script>
+
+<!-- MASARI FINAL LIGHT MODE LOCK: keep the original light design even when device uses dark mode. -->
+<meta name="color-scheme" content="light">
+<style id="masari-force-light-final">
+:root,html,body{color-scheme:only light!important;forced-color-adjust:none!important}
+html,body{background-color:#fbfaf5!important;color:#455d6c!important}
+input,textarea,select,button{color-scheme:only light!important}
+@media(prefers-color-scheme:dark){:root,html,body{color-scheme:only light!important;background-color:#fbfaf5!important;color:#455d6c!important}}
+</style>
+<script id="masari-force-light-final-script">
+(()=>{
+ const root=document.documentElement;
+ const lock=()=>{
+  if(root.classList.contains('dark'))root.classList.remove('dark');
+  if(root.hasAttribute('data-theme'))root.removeAttribute('data-theme');
+  if(document.body){
+   if(document.body.classList.contains('dark'))document.body.classList.remove('dark');
+   if(document.body.hasAttribute('data-theme'))document.body.removeAttribute('data-theme');
+   document.body.style.setProperty('color-scheme','only light','important');
+  }
+  root.style.setProperty('color-scheme','only light','important');
+ };
+ lock();
+ document.addEventListener('DOMContentLoaded',lock);
+ const observer=new MutationObserver(lock);
+ observer.observe(root,{attributes:true,attributeFilter:['class','data-theme']});
+ const watchBody=()=>{if(document.body)observer.observe(document.body,{attributes:true,attributeFilter:['class','data-theme']});lock();};
+ if(document.body)watchBody();else document.addEventListener('DOMContentLoaded',watchBody,{once:true});
+})();
+</script>
 </body>
 </html>
