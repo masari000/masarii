@@ -2031,5 +2031,25 @@ input,textarea,select,button{color-scheme:only light!important}
  if(document.body)watchBody();else document.addEventListener('DOMContentLoaded',watchBody,{once:true});
 })();
 </script>
+
+<!-- MASARI PERMANENT LIGHT THEME: final override for device/browser dark mode -->
+<meta name="color-scheme" content="light">
+<style id="masari-permanent-light-theme">
+:root,html,body{color-scheme:light!important;forced-color-adjust:none!important}
+html,body,body.dark,html.dark,body[data-theme="dark"],html[data-theme="dark"]{background-color:#fbfaf5!important;color:#455d6c!important;--paper:#fbfaf5!important;--card:#fffefa!important;--ink:#455d6c!important;--line:#d8e0e3!important;--muted:#8d9497!important;--primary:#637f91!important;--soft:#86a2b3!important;--accent:#ffe69d!important}
+body.dark .topbar,body.dark .sidebar,body.dark .footer{background:rgba(251,250,245,.96)!important;color:#455d6c!important;border-color:#d8e0e3!important}
+body.dark .top-search,body.dark .icon-btn,body.dark .btn,body.dark .card,body.dark .stat,body.dark .unit-card,body.dark .modal-card,body.dark .empty,body.dark .callout,body.dark .side-card,body.dark .search-box input,body.dark select,body.dark textarea,body.dark .number-input,body.dark .option,body.dark .resource-row,body.dark .tool-card{background:#fffefa!important;color:#455d6c!important;border-color:#d8e0e3!important}
+body.dark .hero{background:linear-gradient(135deg,#fefdf8 0%,#e8f0f3 100%)!important;color:#455d6c!important;border-color:#cfdde2!important;box-shadow:0 12px 35px rgba(69,93,108,.10)!important}
+body.dark .hero h1,body.dark .section-head h2,body.dark .page-head h1,body.dark h2,body.dark h3,body.dark p,body.dark label,body.dark .main-nav a{color:#455d6c!important}
+body.dark .hero p,body.dark .muted,body.dark .section-head p,body.dark .breadcrumbs,body.dark .lesson-meta{color:#637f91!important}
+body.dark .hero h1 em{background:#ffe69d!important;color:#455d6c!important}
+body.dark .main-nav a:hover,body.dark .main-nav a.active{background:#dce9ee!important;color:#455d6c!important}
+body.dark input,body.dark textarea,body.dark select,button,input,textarea,select{color-scheme:light!important}
+@media(prefers-color-scheme:dark){html,body{color-scheme:light!important;background-color:#fbfaf5!important;color:#455d6c!important}}
+</style>
+<script id="masari-permanent-light-theme-lock">
+(()=>{const force=()=>{try{const r=document.documentElement;r.classList.remove('dark');r.removeAttribute('data-theme');r.style.setProperty('color-scheme','light','important');if(document.body){document.body.classList.remove('dark');document.body.removeAttribute('data-theme');document.body.style.setProperty('color-scheme','light','important')}}catch(e){}};force();document.addEventListener('DOMContentLoaded',force);new MutationObserver(force).observe(document.documentElement,{attributes:true,attributeFilter:['class','data-theme']});})();
+</script>
+
 </body>
 </html>
